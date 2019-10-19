@@ -1,0 +1,342 @@
+<style>
+table.table-bordered td {padding:4px;}
+label {font-weight:bold; display:block;}
+#map {width:100%;height:100%;}
+.button-status B {font-size:32px;opacity:0.25}
+</style>
+
+#if ($FALSE)
+<nav aria-label="breadcrumb">
+	<ol class="breadcrumb">
+		<li class="breadcrumb-item"><a href="index.jsp">Home</a></li>
+		<li class="breadcrumb-item">GNSS RTK</li>
+	</ol>
+</nav>
+#end
+
+
+<div class="row">
+	<div class="col-md-2">
+		<label>GNSS WS</label>
+		<input id="gnss_ws" class="form-control" value="ws://54.77.64.148:5001"/>
+	</div>
+	<div class="col-md-2">
+		<label>Data Packets</label>
+		<div id="gnss_messages"></div>
+	</div>
+	<div class="col-md-2">
+		<label>GNSS WS</label>
+		<input id="gamepad_ws" class="form-control" value="ws://54.77.64.148:5002"/>
+	</div>
+	<div class="col-md-2">
+		<label>Gamepad Messages</label>
+		<div id="gamepad_messages"></div>
+	</div>
+	<div class="col-md-4">
+	
+		<span class="button-status">
+		<b id="btn_status_blue" style="color:blue">⬤</b>
+		<b id="btn_status_red" style="color:red">⬤</b>
+		<b id="btn_status_yellow" style="color:yellow">⬤</b>
+		<b id="btn_status_green" style="color:green">⬤</b>
+		</span>
+		
+		<button id="btn_reconnect" class="btn btn-primary">Reconnect</button>
+		<button id="btn_disconnect" class="btn btn-primary">Disconnect</button>
+		<button id="btn_elevation" class="btn btn-outline-primary">Elevation</button>
+		<button id="btn_keep_centered" class="btn btn-outline-primary">Keep centered</button>
+		
+	</div>
+</div>
+
+
+
+<div class="row" style="height:100%">
+	<div id="map"></div>
+</div>
+
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.5.1/leaflet.css" />
+
+<script src="http://mbostock.github.com/d3/d3.js"></script>
+<script src="${SMOOTHIE_SCRIPT}"></script>
+<script>
+
+var breadcrumbTrailLength = 600;
+
+// WebSocket object
+var gnssWebsocket;
+var gamepadWebsocket;
+
+var map;
+var messageId = 0;
+
+var currentLocationMarker;
+var trailBreadcrumbs = [];
+var lastCenteringTime = 0;
+var lastPvtFlags;
+
+var telemetryStatus = "not connected";
+
+var buttonColors = ["black","blue","red","yellow","green"];
+
+var buttonStatus = {
+	red: false,
+	blue: false
+};
+
+function updateTelemetryStatus (newStatus) {
+	telemetryStatus = newStatus;
+	$("#telemetry_status").html(telemetryStatus);
+}
+function makeCrosshairSvg (color) {
+	return "<svg xmlns='http://www.w3.org/2000/svg'>"
+	+ "<line x1='0' y1='50%' x2='100%' y2='50%' stroke='red'/>"
+	+ "<line x1='50%' y1='0' x2='50%' y2='100%' stroke='red'/>"
+	+ "<circle cx='50%' cy='50%' r='40%' stroke='" + color + "' stroke-width='1.5' fill='none'/>"
+	+ "</svg>";
+}
+function makeLetterMarkerSvg (color,letter) {
+	return "<svg xmlns='http://www.w3.org/2000/svg'>"
+	+ "<line x1='0' y1='50%' x2='100%' y2='50%' stroke='red'/>"
+	+ "<line x1='50%' y1='0' x2='50%' y2='100%' stroke='red'/>"
+	+ "<circle cx='50%' cy='50%' r='40%' stroke='" + color + "' stroke-width='1.5' fill='none'/>"
+	+ "<text x='50%' y='50%' text-anchor='middle' dominant-baseline='middle'>" + letter + "</text>"
+	+ "</svg>";
+}
+
+
+	
+	// From https://gist.github.com/clhenrick/6791bb9040a174cd93573f85028e97af
+	var SVGIcon = L.Icon.extend({
+		options: {
+			iconSize:     [24, 24],
+			iconAnchor:   [12, 12]
+		}
+	});
+	
+	
+	var breadCrumbIcons = {};
+	
+	buttonColors.forEach(function(color) {
+		var svg = "<svg xmlns='http://www.w3.org/2000/svg'>"
+		+ "<circle cx='50%' cy='50%' r='10%' fill='" + color + "'/>"
+		+ "</svg>";
+		breadCrumbIcons[color] = new SVGIcon({iconUrl:encodeURI("data:image/svg+xml," + svg).replace('#','%23')});
+	});
+	
+	var crosshairIcons = {
+		noFix: new SVGIcon({iconUrl:encodeURI("data:image/svg+xml," + makeLetterMarkerSvg("red","!")).replace('#','%23')}),
+		noDiff : new SVGIcon({iconUrl:encodeURI("data:image/svg+xml," + makeCrosshairSvg("orange")).replace('#','%23')}),
+		floatingRtk : new SVGIcon({iconUrl:encodeURI("data:image/svg+xml," + makeCrosshairSvg("green")).replace('#','%23')}),
+		fixedRtk : new SVGIcon({iconUrl:encodeURI("data:image/svg+xml," + makeCrosshairSvg("blue")).replace('#','%23')}),
+	}
+	currentLocationMarkers  = {
+		noFix:  L.marker([0,0],{icon:crosshairIcons["noFix"]}),
+		noDiff:  L.marker([0,0],{icon:crosshairIcons["noDiff"]}),
+		floatingRtk:  L.marker([0,0],{icon:crosshairIcons["floatingRtk"]}),
+		fixedRtk:  L.marker([0,0],{icon:crosshairIcons["fixedRtk"]})
+	};
+	
+	currentLocationMarker = currentLocationMarkers["noDiff"];
+	
+	var pathPolyline;
+	
+	
+
+jQuery(function(){
+
+
+	$("#btn_reconnect").click(function(){
+		connectToGnssWebsocket();
+		connectToGamepadWebsocket();
+	});	
+	$("#btn_disconnect").click(function(){
+		ws.close();
+	});
+	
+	map = L.map('map').setView([51.505, -0.09], 17);
+	L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		minZoom:4,maxZoom:24,maxNativeZoom:18,
+		attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+	}).addTo(map);
+	currentLocationMarker.addTo(map);
+
+	pathPolyline = L.polyline([],{color:"black"}).addTo(map);
+
+	connectToGnssWebsocket();
+	connectToGamepadWebsocket();	
+	
+});
+
+/**
+ * Connect to socket with uBlox NAV-PVT message in text format
+ */
+function connectToGnssWebsocket () {
+	//var wsHost = window.location.hostname;
+	//var wsHost = "10.7.0.42";
+	//var wsHost = "192.168.1.40";
+	//var wsHost = "localhost";
+	//var wsPort = 5001;
+	var wsAddr = jQuery("#gnss_ws").val();
+	console.log("wsAddr=" + wsAddr);
+	var ws = new WebSocket(wsAddr);
+	
+	
+	ws.onopen = function () {
+		console.log("GNSS websocket open");
+		updateTelemetryStatus("connected");
+		$("#btn_reconnect").removeClass("btn-primary").addClass("btn-default");
+	};
+	ws.onclose = function () {
+		console.log("GNSS websocket closed");
+		updateTelemetryStatus("not connected");
+		$("#btn_reconnect").removeClass("btn-default");
+		$("#btn_reconnect").addClass("btn-primary");
+	};
+	ws.onerror = function () {
+		console.log("GNSS websocket error");
+		updateTelemetryStatus("comms error");
+	};
+	ws.onmessage = function(event){
+		var p = event.data.split(/\s+/);
+		var lat = p[5]*1;
+		var lng = p[6]*1;
+		var fixType = p[2]*1;
+		var flags = p[3]*1;
+		var flags2 = p[4]*1;
+		
+		var fixOkFlag = (flags&0x01 !== 0 ? true : false);
+		var diffSolutionFlag = ( (flags&0x02) !== 0 ? true : false);
+		
+		// Expected values 0 = no carrier phase range solution, 1 = floating ambiguities, 2 = fixed ambiguities
+		var carrierSolution = (flags>>6);
+		
+		$("#gnss_messages").html(event.data 
+		  + "fixType=" + fixType
+		  //+ " fixOk=" + fixOkFlag
+		  //+ " diffSoln=" + diffSolutionFlag 
+		  //+ " carrierSolution=" + carrierSolution
+		);
+		
+		if (lastPvtFlags != flags) {
+			console.log("updating marker");
+			map.removeLayer(currentLocationMarker);
+			if (fixType === 0) {
+				console.log("no fix marker");
+				currentLocationMarker = currentLocationMarkers["noFix"];
+				currentLocationMarker.setLatLng([lat,lng]);
+				map.addLayer(currentLocationMarker);
+			} else {
+				if (diffSolutionFlag) {
+					currentLocationMarker = currentLocationMarkers["fixedRtk"];
+				} else {
+					currentLocationMarker = currentLocationMarkers["noDiff"];
+				}
+				currentLocationMarker.setLatLng([lat,lng]);
+				map.addLayer(currentLocationMarker);
+			}
+			lastPvtFlags = flags;
+		} else {
+			currentLocationMarker.setLatLng([lat,lng]);
+		}
+		
+		//pathPolyline.addLatLng([lat,lng]);
+		//map.panTo([lat.toFixed(4),lng.toFixed(4)]);
+		
+		// Center map on current location (but to avoid jumping around too much do so every 3 seconds)
+		var now = (new Date()).getTime();
+		if (now - lastCenteringTime > 3000) {
+			map.panTo([lat,lng],{duration:1});
+			lastCenteringTime = now;
+		}
+		
+		var nbtn = 0;
+		buttonColors.forEach(function(color){
+			if (buttonStatus[color] === true) {
+				L.marker([lat,lng],{icon:breadCrumbIcons[color],zIndexOffset:1000}).addTo(map);
+				nbtn++;
+			}
+		});
+		
+		// If no buttons down then use breadcrumb trail marker. Limit trail to breadcrumbTrailLength
+		if (nbtn == 0) {
+			var trailBreadcrumb = L.marker([lat,lng],{icon:breadCrumbIcons["black"],opacity:0.25}).addTo(map);
+			trailBreadcrumbs.push(trailBreadcrumb);
+			if (trailBreadcrumbs.length>breadcrumbTrailLength) {
+				trailBreadcrumbs.shift().remove();
+			}
+		}
+	};
+
+	gnssWebsocket = ws;
+}
+
+function connectToGamepadWebsocket () {
+	//var wsHost = window.location.hostname;
+	//var wsHost = "10.7.0.13";
+	//var wsHost = "localhost";
+	//var wsPort = 5002;
+	
+	var wsAddr = jQuery("#gamepad_ws").val();
+	console.log("gamepadWsAddr=" + wsAddr);
+	var ws = new WebSocket(wsAddr);
+	
+	ws.onopen = function () {
+		console.log("gamepad websocket open");
+		updateTelemetryStatus("connected");
+		$("#btn_reconnect").removeClass("btn-primary").addClass("btn-default");
+	};
+	ws.onclose = function () {
+		console.log("gamepad websocket closed");
+		updateTelemetryStatus("not connected");
+		$("#btn_reconnect").removeClass("btn-default");
+		$("#btn_reconnect").addClass("btn-primary");
+	};
+	ws.onerror = function () {
+		console.log("gamepad websocket error");
+		updateTelemetryStatus("comms error");
+	};
+	ws.onmessage = function(event){
+		$("#gamepad_messages").html(event.data);
+		var p = event.data.split(/\s+/);
+		
+		var keyEvent = p[1];
+		var keyCode = p[2]*1;
+		
+		var state = (keyEvent==="keydown" ? true:false);
+		
+		console.log("keyEvent=" + keyEvent + " keyCode=" + keyCode + " state=" + state);
+		var color;
+		switch (keyCode) {
+			case 288: {
+				color = "blue";
+				break;
+			}
+			case 289: {
+				color = "red";
+				break;
+			}
+			case 290: {
+				color = "yellow";
+				break;
+			}
+			case 291: {
+				color = "green";
+				break;
+			}
+		}
+		buttonStatus[color] = state;
+		jQuery("#btn_status_" + color).css("opacity", state ? 1.0:0.25);
+				
+		console.log("message done");
+	};
+
+	gamepadWebsocket = ws;
+}
+
+</script>
+

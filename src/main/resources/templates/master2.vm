@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<!-- saved from url=(0053)https://getbootstrap.com/docs/4.3/examples/dashboard/ -->
+<html lang="en" style="height:100%">
+
+	<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>RTK_survey</title>
+	<link href="rtk_survey.css" rel="stylesheet">
+
+	<!-- Bootstrap core CSS -->
+	<link href="./webjars/bootstrap/4.3.0/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+
+	<link href="${FONT_AWESOME_ROOT}/css/font-awesome.min.css" rel="stylesheet">
+
+
+
+	<style>
+	.bd-placeholder-img {
+		font-size: 1.125rem;
+		text-anchor: middle;
+		-webkit-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
+		user-select: none;
+	}
+
+	@media (min-width: 768px) {
+		.bd-placeholder-img-lg {
+			font-size: 3.5rem;
+		}
+	}
+	</style>
+	
+	<!-- Custom styles for this template -->
+	<link href="dashboard.css" rel="stylesheet">
+	<style type="text/css">/* Chart.js */
+		@-webkit-keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}@keyframes chartjs-render-animation{from{opacity:0.99}to{opacity:1}}.chartjs-render-monitor{-webkit-animation:chartjs-render-animation 0.001s;animation:chartjs-render-animation 0.001s;}
+	</style>
+
+	<script src="${JQUERY_SCRIPT}" crossorigin="anonymous"></script>
+	
+</head>
+
+
+<body style="height:80%">
+
+<div class="container-fluid mh-100" style="height:100%">
+	<div class="row mh-100" style="height:100%">
+
+
+		<main role="main" class="col-md-12 ml-sm-auto col-lg-12 px-4">
+		
+
+
+
+	<br />
+
+	#if ($pageId.startsWith("./"))
+		#set($templateFileName=$pageId+".vm")
+	#else
+		#set($templateFileName="/_"+$pageId+".vm")
+	#end
+	#parse ($templateFileName)
+
+
+
+		</main>
+	</div><!-- end .row -->
+</div><!-- end .container-fluid -->
+
+<script src="./webjars/bootstrap/4.3.0/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+<script>
+var API = "${API}";
+</script>
+</body>
+</html>
