@@ -1,0 +1,17 @@
+table.stdtable {border-collapse: collapse; width:100% }
+table.stdtable thead, table.stdtable tfoot {background-color: #eee; font-weight:bold;}
+table.stdtable tbody.subtotals {font-weight:bold;}
+table.stdtable tbody.grandtotals {font-weight:bold; background-color: #eee;}
+
+table.stdtable td, table.stdtable th { border: 1px solid #ccc; padding:4px; vertical-align:top;}
+table.stdtable th {background:#eee}
+
+table.stdtable tr.deleted {text-decoration: line-through;}
+table.stdtable tr.lc_DELETED {display:none;text-decoration:line-through;}
+table.stdtable tr.lc_NORMAL .undelete {display:none; text-decoration:none;}
+table.stdtable tr.s_ELIMINATED td.strikethruable {text-decoration:line-through;}
+table.stdtable td.number {text-align:right}
+table.stdtable td.n {text-align:right;}
+table.stdtable td.derived {background-color:#fafafa;}
+table.stdtable .exceeded {color:red; font-weight:bold;}
+table.stdtable .exceeded::before {content:"⚠ ";}

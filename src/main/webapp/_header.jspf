@@ -1,0 +1,23 @@
+<%@page import="ie.strix.rtk_survey.RTKSurvey"%>
+<%@page import="java.util.List"%>
+<%@page import="org.slf4j.LoggerFactory"%>
+<%@page import="org.slf4j.Logger"%>
+<%@page import="javax.persistence.EntityManager"%>
+<%@page import="ie.strix.rtk_survey.HibernateUtil"%>
+<%@page import="ie.strix.template.TemplateRegistry"%>
+<%@page import="ie.strix.template.Context"%>
+<%
+
+	final Logger log = LoggerFactory.getLogger(this.getClass());
+
+	log.info("start of _header.jspf");
+
+	TemplateRegistry templates = TemplateRegistry.getInstance();
+	Context context = new Context(request,response);
+	RTKSurvey.initializeVelocityContext(context, user, request);
+	
+	EntityManager em = HibernateUtil.getEntityManager();
+	
+	log.info("end of _header.jspf");
+
+%>
