@@ -1,3 +1,4 @@
+<%@page import="ie.strix.rtk_survey.User"%>
 <%@page import="ie.strix.rtk_survey.RTKSurvey"%>
 <%@page import="java.util.List"%>
 <%@page import="org.slf4j.LoggerFactory"%>
@@ -14,6 +15,9 @@
 
 	TemplateRegistry templates = TemplateRegistry.getInstance();
 	Context context = new Context(request,response);
+	
+	User user = null;
+	
 	RTKSurvey.initializeVelocityContext(context, user, request);
 	
 	EntityManager em = HibernateUtil.getEntityManager();

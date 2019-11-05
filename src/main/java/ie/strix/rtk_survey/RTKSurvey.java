@@ -55,7 +55,7 @@ public class RTKSurvey implements ServletContextListener {
 	 */
 	@Override
 	public void contextInitialized(ServletContextEvent event) {
-		System.err.println ("*** STARTING TIRTBX contextPath=" + event.getServletContext().getContextPath());
+		System.err.println ("*** STARTING " + event.getServletContext().getContextPath());
 		
 		appRoot = new File(event.getServletContext().getRealPath("/"));
 
